@@ -1,4 +1,4 @@
-package com.example.musicexample
+package com.example.music_example.player
 
 import android.app.*
 import android.content.Context
@@ -7,8 +7,12 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.media.session.MediaController
 import android.media.session.MediaSession
+import android.media.session.MediaSessionManager
 import android.os.*
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.example.music_example.MainActivity
+import com.example.music_example.R
 import java.lang.Exception
 import kotlin.concurrent.thread
 
@@ -17,12 +21,8 @@ class PlayerService : Service() {
     private val binder = LocalBinder()
     private var currentPosition: Int = -1
     private var isPlaying: Boolean = false
+
     private lateinit var mediaPlayer: MediaPlayer
-    private lateinit var notificationManager: NotificationManager
-    private lateinit var notificationChannel: NotificationChannel
-    private lateinit var notificationBuilder: Notification.Builder
-    private lateinit var mediaSession: MediaSession
-    private lateinit var mediaController: MediaController
 
     /** methods for clients */
     fun createSong(songPosition: Int) {
@@ -48,14 +48,15 @@ class PlayerService : Service() {
         // update SeekBar
         updateSeekBarProgress()
         // init notification
-        initNotify(strSongTitle)
+        initNotification(strSongTitle)
     }
 
     private fun setSongTitle(strSongTitle: String) {
         val bundle = Bundle()
         bundle.putString(SONG_TITLE_VALUE, strSongTitle)
         val message = Message()
-        message.what = MESSAGE_SONG_TITLE
+        message.what =
+            MESSAGE_SONG_TITLE
         message.data = bundle
         PlayerActivity.handler.sendMessage(message)
     }
@@ -89,7 +90,8 @@ class PlayerService : Service() {
         val bundle = Bundle()
         bundle.putInt(SEEK_BAR_MAX_VALUE, value)
         val message = Message()
-        message.what = MESSAGE_SEEK_BAR_MAX
+        message.what =
+            MESSAGE_SEEK_BAR_MAX
         message.data = bundle
         PlayerActivity.handler.sendMessage(message)
     }
@@ -117,7 +119,8 @@ class PlayerService : Service() {
         val bundle = Bundle()
         bundle.putInt(PROGRESS_VALUE, currentProgress)
         val message = Message()
-        message.what = MESSAGE_SEEK_BAR_PROGRESS
+        message.what =
+            MESSAGE_SEEK_BAR_PROGRESS
         message.data = bundle
         PlayerActivity.handler.sendMessage(message)
     }
@@ -136,55 +139,50 @@ class PlayerService : Service() {
         createSong(currentPosition)
     }
 
-    private fun initNotify(songTitle: String) {
-        createNotifyChannel()
-        createNotify(songTitle)
-        setNotifyTapAction()
-    }
-
-    private fun createNotify(songTitle: String) {
-        mediaSession = MediaSession(this, "test media session compat")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationBuilder = Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(songTitle)
-                .setContentText("Playing")
-                .setSmallIcon(R.drawable.ic_music_note)
-                .setLargeIcon(BitmapFactory.decodeResource(this.resources, R.drawable.ic_music))
-                .addAction(R.drawable.ic_skip_previous, "Pre", null)
-                .addAction(R.drawable.ic_pause, "Pause", null)
-                .addAction(R.drawable.ic_skip_next, "Next", null)
-                .setStyle(
-                    Notification.MediaStyle()
-                        .setShowActionsInCompactView(0, 1, 2)
-                        .setMediaSession(mediaSession.sessionToken)
-                )
+    private fun initNotification(songTitle: String) {
+        //---------
+        /** Action play */
+        val intentPlay = Intent(this, PlayerService::class.java).apply {
+            action = ACTION_PLAY
         }
-        notificationManager.notify(1, notificationBuilder.build())
-    }
+        val pendingIntentPlay = PendingIntent.getService(this,
+            0, intentPlay, 0)
 
-    private fun createNotifyChannel() {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is new and not in the support library
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            notificationChannel =
-                NotificationChannel(CHANNEL_ID, R.string.app_name.toString(), importance)
-            // Register the channel with the system
-            notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(notificationChannel)
+        /** Action pause */
+        val intentPause = Intent(this, PlayerService::class.java).apply {
+            action = ACTION_PAUSE
         }
-    }
+        val pendingIntentPause = PendingIntent.getService(this,
+            0, intentPause, 0)
 
-    private fun setNotifyTapAction() {
-        // Create an explicit intent for an PlayerActivity
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        /** Action previous */
+        val intentPrevious = Intent(this, PlayerService::class.java).apply {
+            action = ACTION_PREVIOUS
         }
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, 0)
-        // Set the intent that will fire when the user taps the notification
-        notificationBuilder.setContentIntent(pendingIntent)
-            .setAutoCancel(true)
+        val pendingIntentPrevious = PendingIntent.getService(this,
+            0, intentPrevious, 0)
+
+        /** Action next */
+        val intentNext = Intent(this, PlayerService::class.java).apply {
+            action = ACTION_NEXT
+        }
+        val pendingIntentNext = PendingIntent.getService(this,
+            0, intentNext, 0)
+        //---------
+        val mBuilder = NotificationCompat.Builder(this, PlayerActivity.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_music_note)
+            .setContentTitle(songTitle)
+            .setContentText("Playing")
+            .setLargeIcon(BitmapFactory.decodeResource(this.resources,
+                R.drawable.ic_music
+            ))
+            .addAction(R.drawable.ic_skip_previous, "Pre", pendingIntentPrevious)
+            .addAction(R.drawable.ic_pause, "Pause", pendingIntentPause)
+            .addAction(R.drawable.ic_skip_next, "Next", pendingIntentNext)
+            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
+                .setShowActionsInCompactView(0, 1, 2))
+            .build()
+        PlayerActivity.notificationManager.notify(NOTIFICATION_ID, mBuilder)
     }
 
     inner class LocalBinder : Binder() {
@@ -193,6 +191,11 @@ class PlayerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action.toString()) {
+            ACTION_PREVIOUS -> onClickButtonPrevious()
+            ACTION_PAUSE -> onClickButtonPause(isPlaying)
+            ACTION_NEXT -> onClickButtonNext()
+        }
         return START_STICKY
     }
 
@@ -211,6 +214,11 @@ class PlayerService : Service() {
         const val PROGRESS_VALUE = "seek_bar_progress"
         const val MESSAGE_SEEK_BAR_MAX = 3
         const val SEEK_BAR_MAX_VALUE = "seek_bar_max_value"
-        const val CHANNEL_ID = "com.example.musicexample"
+        const val NOTIFICATION_ID = 1
+
+        const val ACTION_PLAY = "action_play"
+        const val ACTION_PAUSE = "action_pause"
+        const val ACTION_PREVIOUS = "action_previous"
+        const val ACTION_NEXT = "action_next"
     }
 }

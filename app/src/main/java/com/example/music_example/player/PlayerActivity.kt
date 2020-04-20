@@ -1,20 +1,21 @@
-package com.example.musicexample
+package com.example.music_example.player
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.os.Bundle
-import android.os.Handler
-import android.os.IBinder
-import android.os.Message
-import android.util.Log
+import android.os.*
 import android.view.View
 import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
+import com.example.music_example.MainActivity
+import com.example.music_example.PlayerIntentService
+import com.example.music_example.R
 import kotlinx.android.synthetic.main.activity_player.*
 
-class PlayerActivity: AppCompatActivity(),
+class PlayerActivity : AppCompatActivity(),
     SeekBar.OnSeekBarChangeListener {
 
     private lateinit var mService: PlayerService
@@ -51,11 +52,27 @@ class PlayerActivity: AppCompatActivity(),
 
     override fun onStart() {
         super.onStart()
+        initNotificationChannel()
         // Bind to PlayerService
-        Intent(this, PlayerService::class.java).also {
-            intent ->
-            startService(intent)
-            bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        val intent = Intent(this, PlayerService::class.java)
+        startService(intent)
+        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        startService(intent)
+    }
+
+    private fun initNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationChannel = NotificationChannel(
+                CHANNEL_ID,
+                R.string.app_name.toString(),
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            // Register the channel with the system
+            notificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(notificationChannel)
         }
     }
 
@@ -72,7 +89,7 @@ class PlayerActivity: AppCompatActivity(),
     }
 
     private fun initHandler() {
-        handler = object: Handler() {
+        handler = object : Handler() {
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     PlayerService.MESSAGE_SONG_TITLE -> setSongTitle(msg)
@@ -132,5 +149,7 @@ class PlayerActivity: AppCompatActivity(),
 
     companion object {
         lateinit var handler: Handler
+        lateinit var notificationManager: NotificationManager
+        const val CHANNEL_ID = "com.example.musicexample"
     }
 }

@@ -1,9 +1,11 @@
-package com.example.musicexample
+package com.example.music_example.adapter
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.example.music_example.R
+import com.example.music_example.model.SongItem
 import kotlinx.android.synthetic.main.item_song.view.*
 
 class SongAdapter(private val songList: ArrayList<SongItem>,
